@@ -38,67 +38,116 @@ document.addEventListener('DOMContentLoaded', function() {
     const formMessage = document.querySelector('.form-message');
 
     if (contactForm) {
-        contactForm.addEventListener('submit', async function(e) {
+        // Real-time phone number validation
+        const phoneInput = contactForm.querySelector('input[name="phone"]');
+        phoneInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 10) value = value.slice(0, 10);
+            e.target.value = value;
+        });
+
+        contactForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            // Clear previous messages
-            formMessage.textContent = '';
-            formMessage.className = 'form-message';
+            // Get form data
+            const formData = new FormData(contactForm);
+            const name = formData.get('name');
+            const email = formData.get('email');
+            const phone = formData.get('phone');
+            const service = formData.get('service');
+            const message = formData.get('message');
             
-            // Show loading state
-            const submitButton = contactForm.querySelector('button[type="submit"]');
-            const originalButtonText = submitButton.innerHTML;
-            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-            submitButton.disabled = true;
+            // Enhanced validation
+            if (!name || !email || !phone || !service || !message) {
+                showFormMessage('Please fill in all required fields marked with *.', false);
+                return;
+            }
+            
+            if (name.length < 3) {
+                showFormMessage('Please enter your full name.', false);
+                return;
+            }
+            
+            if (!isValidEmail(email)) {
+                showFormMessage('Please enter a valid email address.', false);
+                return;
+            }
+            
+            if (phone.length !== 10) {
+                showFormMessage('Please enter a valid 10-digit phone number.', false);
+                return;
+            }
+            
+            if (message.length < 10) {
+                showFormMessage('Please provide more details in your message.', false);
+                return;
+            }
+            
+            // Show success message
+            showFormMessage('Thank you for reaching out! Our team will contact you within 24 hours.', true);
+            contactForm.reset();
 
-            try {
-                const formData = new FormData(contactForm);
-                const response = await fetch('/send_email', {
-                    method: 'POST',
-                    body: formData
-                });
+            // Scroll the success message into view
+            setTimeout(() => {
+                formMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        });
 
-                const data = await response.json();
-                
-                // Show success/error message with animation
-                formMessage.textContent = data.message;
-                formMessage.className = `form-message ${data.success ? 'success' : 'error'}`;
-                formMessage.style.display = 'block';
+        // Add input validation styles
+        const inputs = contactForm.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            input.addEventListener('invalid', function(e) {
+                e.preventDefault();
+                this.classList.add('invalid');
+            });
+
+            input.addEventListener('input', function() {
+                if (this.classList.contains('invalid')) {
+                    this.classList.remove('invalid');
+                }
+            });
+        });
+    }
+    
+    function showFormMessage(text, isSuccess) {
+        if (!formMessage) return;
+        
+        // Create icon element
+        const icon = document.createElement('i');
+        icon.className = isSuccess ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
+        
+        // Set message content with icon
+        formMessage.innerHTML = '';
+        formMessage.appendChild(icon);
+        formMessage.appendChild(document.createTextNode(' ' + text));
+        
+        // Apply styles
+        formMessage.className = `form-message ${isSuccess ? 'success' : 'error'}`;
+        formMessage.style.display = 'block';
+        formMessage.style.opacity = '0';
+        formMessage.style.transform = 'translateY(-10px)';
+        
+        // Add animation
+        requestAnimationFrame(() => {
+            formMessage.style.opacity = '1';
+            formMessage.style.transform = 'translateY(0)';
+        });
+        
+        // Auto-hide message
+        if (isSuccess) {
+            setTimeout(() => {
                 formMessage.style.opacity = '0';
                 formMessage.style.transform = 'translateY(-10px)';
-                
-                // Trigger animation
                 setTimeout(() => {
-                    formMessage.style.opacity = '1';
-                    formMessage.style.transform = 'translateY(0)';
-                }, 10);
-
-                if (data.success) {
-                    contactForm.reset();
-                    
-                    // Scroll message into view smoothly
-                    formMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                formMessage.textContent = 'An error occurred. Please try again later.';
-                formMessage.className = 'form-message error';
-                formMessage.style.display = 'block';
-            } finally {
-                // Restore button state
-                submitButton.innerHTML = originalButtonText;
-                submitButton.disabled = false;
-
-                // Hide message after 5 seconds
-                setTimeout(() => {
-                    formMessage.style.opacity = '0';
-                    formMessage.style.transform = 'translateY(-10px)';
-                    setTimeout(() => {
-                        formMessage.style.display = 'none';
-                    }, 300);
-                }, 5000);
-            }
-        });
+                    formMessage.style.display = 'none';
+                }, 300);
+            }, 5000);
+        }
+    }
+    
+    function isValidEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
     }
 
     // Animate elements on scroll
@@ -137,4 +186,3 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initial check for elements in view
     animateOnScroll();
 });
-
