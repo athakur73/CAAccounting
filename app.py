@@ -38,7 +38,8 @@ def send_email():
 
         # Create email content
         msg = MIMEMultipart()
-        msg['From'] = os.getenv('EMAIL_FROM', 'your-email@gmail.com')
+        sender_email = os.getenv('SMTP_USERNAME')  # Use SMTP username as sender
+        msg['From'] = f'Suraj Kumar & Co <{sender_email}>'
         msg['To'] = 'casurajkumar1985@gmail.com'
         msg['Subject'] = 'New Contact Form Submission'
 
@@ -72,10 +73,17 @@ def send_email():
         smtp_password = os.getenv('SMTP_PASSWORD', 'your-app-password')
 
         # Send email
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_username, smtp_password)
-            server.send_message(msg)
+        try:
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.ehlo()  # Identify ourselves to the SMTP server
+                server.starttls()  # Enable TLS encryption
+                server.ehlo()  # Re-identify ourselves over TLS connection
+                server.login(smtp_username, smtp_password)
+                server.send_message(msg)
+        except smtplib.SMTPAuthenticationError as auth_error:
+            raise Exception("Email authentication failed. Please make sure you're using an App Password if 2-Step Verification is enabled.")
+        except smtplib.SMTPException as smtp_error:
+            raise Exception(f"SMTP error: {str(smtp_error)}")
 
         return jsonify({
             'success': True,
@@ -83,11 +91,13 @@ def send_email():
         })
 
     except Exception as e:
-        print(f"Error sending email: {str(e)}")
+        error_msg = f"Error sending email: {str(e)}"
+        print(error_msg)
         return jsonify({
             'success': False,
-            'message': 'Sorry, there was an error sending your message. Please try again later.'
+            'message': error_msg if app.debug else 'Sorry, there was an error sending your message. Please try again later.'
         }), 500
 
 if __name__ == '__main__':
+    app.debug = True  # Enable debug mode to see detailed errors
     app.run(port=8080)

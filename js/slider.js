@@ -6,10 +6,8 @@ class Slider {
         this.autoPlayInterval = null;
         this.isTransitioning = false;
 
-        // Create navigation dots
+        // Create navigation elements
         this.createDots();
-        
-        // Create navigation arrows
         this.createArrows();
 
         // Initialize the slider
@@ -20,6 +18,12 @@ class Slider {
 
         // Add touch support
         this.initTouchSupport();
+
+        // Add keyboard navigation
+        this.initKeyboardNavigation();
+
+        // Add intersection observer for performance
+        this.initIntersectionObserver();
     }
 
     createDots() {
@@ -60,9 +64,39 @@ class Slider {
         if (this.isTransitioning) return;
         this.isTransitioning = true;
 
-        // Update slides
-        this.slides[this.currentSlide].classList.remove('active');
-        this.slides[index].classList.add('active');
+        // Update slides with smooth transitions
+        const currentSlide = this.slides[this.currentSlide];
+        const nextSlide = this.slides[index];
+
+        // Reset any ongoing animations
+        currentSlide.style.transition = 'none';
+        nextSlide.style.transition = 'none';
+
+        // Set initial positions
+        if (index > this.currentSlide) {
+            nextSlide.style.transform = 'translateX(100%) scale(0.95)';
+        } else {
+            nextSlide.style.transform = 'translateX(-100%) scale(0.95)';
+        }
+
+        // Force reflow
+        void nextSlide.offsetWidth;
+
+        // Add transitions back
+        currentSlide.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+        nextSlide.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+
+        // Animate slides
+        currentSlide.style.transform = index > this.currentSlide ? 
+            'translateX(-100%) scale(0.95)' : 'translateX(100%) scale(0.95)';
+        currentSlide.style.opacity = '0';
+        
+        nextSlide.style.transform = 'translateX(0) scale(1)';
+        nextSlide.style.opacity = '1';
+
+        // Update active classes
+        currentSlide.classList.remove('active');
+        nextSlide.classList.add('active');
         
         // Update dots
         this.dots[this.currentSlide].classList.remove('active');
@@ -87,7 +121,12 @@ class Slider {
     }
 
     startAutoPlay() {
+        if (this.autoPlayInterval) {
+            clearInterval(this.autoPlayInterval);
+        }
+
         this.autoPlayInterval = setInterval(() => {
+            if (document.hidden) return;
             this.nextSlide();
         }, 5000);
 
@@ -99,24 +138,51 @@ class Slider {
         this.slider.addEventListener('mouseleave', () => {
             this.startAutoPlay();
         });
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                clearInterval(this.autoPlayInterval);
+            } else {
+                this.startAutoPlay();
+            }
+        });
     }
 
     initTouchSupport() {
         let startX = 0;
+        let startY = 0;
         let diff = 0;
+        let isScrolling = false;
 
         this.slider.addEventListener('touchstart', (e) => {
             startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            isScrolling = false;
             clearInterval(this.autoPlayInterval);
         }, { passive: true });
 
         this.slider.addEventListener('touchmove', (e) => {
             if (startX === 0) return;
-            diff = startX - e.touches[0].clientX;
-        }, { passive: true });
+
+            const touchX = e.touches[0].clientX;
+            const touchY = e.touches[0].clientY;
+            const diffX = startX - touchX;
+            const diffY = startY - touchY;
+
+            // Determine if scrolling or swiping
+            if (!isScrolling) {
+                isScrolling = Math.abs(diffY) > Math.abs(diffX);
+            }
+
+            if (!isScrolling) {
+                e.preventDefault();
+                diff = diffX;
+            }
+        }, { passive: false });
 
         this.slider.addEventListener('touchend', () => {
-            if (Math.abs(diff) > 50) {
+            if (!isScrolling && Math.abs(diff) > 50) {
                 if (diff > 0) {
                     this.nextSlide();
                 } else {
@@ -124,9 +190,35 @@ class Slider {
                 }
             }
             startX = 0;
+            startY = 0;
             diff = 0;
             this.startAutoPlay();
         });
+    }
+
+    initKeyboardNavigation() {
+        this.slider.setAttribute('tabindex', '0');
+        this.slider.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                this.prevSlide();
+            } else if (e.key === 'ArrowRight') {
+                this.nextSlide();
+            }
+        });
+    }
+
+    initIntersectionObserver() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) {
+                    clearInterval(this.autoPlayInterval);
+                } else {
+                    this.startAutoPlay();
+                }
+            });
+        }, { threshold: 0.5 });
+
+        observer.observe(this.slider);
     }
 }
 

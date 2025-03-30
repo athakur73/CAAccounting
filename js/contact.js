@@ -30,9 +30,22 @@ class ContactForm {
         this.charCount = document.querySelector('.char-count');
         this.messageArea = document.getElementById('message');
         this.phoneInput = document.getElementById('phone');
+        this.dateInput = document.getElementById('preferred_date');
         
         if (this.form) {
             this.initializeEventListeners();
+            this.initializeDateInput();
+        }
+    }
+
+    initializeDateInput() {
+        if (this.dateInput) {
+            const today = new Date();
+            const maxDate = new Date();
+            maxDate.setDate(today.getDate() + 14);
+            
+            this.dateInput.min = today.toISOString().split('T')[0];
+            this.dateInput.max = maxDate.toISOString().split('T')[0];
         }
     }
 
@@ -99,6 +112,18 @@ class ContactForm {
             return false;
         }
 
+        if (input.type === 'date') {
+            const selectedDate = new Date(input.value);
+            const today = new Date();
+            const maxDate = new Date();
+            maxDate.setDate(today.getDate() + 14);
+
+            if (selectedDate < today || selectedDate > maxDate) {
+                input.classList.add('invalid');
+                return false;
+            }
+        }
+
         input.classList.remove('invalid');
         return true;
     }
@@ -127,9 +152,17 @@ class ContactForm {
             return;
         }
 
+        // Format date for display
+        const formattedDate = new Date(data.preferred_date).toLocaleDateString('en-IN', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
         // Show success message with service-specific response
         const serviceName = this.form.querySelector('#service option:checked').textContent;
-        this.showMessage(`Thank you for your interest in our ${serviceName.toLowerCase()}! Our team will contact you within 24 hours to discuss your requirements.`, true);
+        this.showMessage(`Thank you for scheduling a consultation for ${serviceName.toLowerCase()}! We have received your request for ${formattedDate} during the ${data.preferred_time.toLowerCase()} slot. Our team will confirm your appointment within 24 hours.`, true);
         
         // Reset form
         this.form.reset();
@@ -137,12 +170,13 @@ class ContactForm {
             this.charCount.textContent = 'Minimum 10 characters';
             this.charCount.style.color = 'rgba(255, 255, 255, 0.6)';
         }
+        this.initializeDateInput();
     }
 
     validateForm(data) {
-        const { name, email, phone, service, message, privacy } = data;
+        const { name, email, phone, service, message, privacy, preferred_time, preferred_date } = data;
 
-        if (!name || !email || !phone || !service || !message || !privacy) {
+        if (!name || !email || !phone || !service || !message || !privacy || !preferred_time || !preferred_date) {
             this.showMessage('Please fill in all required fields and accept the privacy policy.', false);
             return false;
         }
@@ -164,6 +198,16 @@ class ContactForm {
 
         if (message.length < 10) {
             this.showMessage('Please provide more details in your message (minimum 10 characters).', false);
+            return false;
+        }
+
+        const selectedDate = new Date(preferred_date);
+        const today = new Date();
+        const maxDate = new Date();
+        maxDate.setDate(today.getDate() + 14);
+
+        if (selectedDate < today || selectedDate > maxDate) {
+            this.showMessage('Please select a date within the next 14 days.', false);
             return false;
         }
 
